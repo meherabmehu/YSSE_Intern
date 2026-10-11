@@ -42,3 +42,12 @@
 - [ ] Migration of existing applications after authorization
 
 Board flow: Backlog → Ready → In progress → Review → Done.
+
+## Requested visual improvements
+
+- [x] Add official YSSE logo to shared branding and favicon
+- [x] Add teamwork and learning photographs with illustrative captions
+- [x] Add clickable homepage insights
+- [x] Add department emblems to all nine cards and detail pages
+- [x] Add pointer cursor, hover and keyboard-focus treatment to exploration links
+- [x] Remove demo wording from sign-in/register headings and labels

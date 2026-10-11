@@ -37,3 +37,10 @@ Deployed the functional demo at https://ysse-portal.vercel.app and connected the
 Validation: 15 local API/adapter tests pass, the live PostgreSQL integration test passes in an isolated temporary schema, and both local browser suites pass. Verified the full recruitment lifecycle on the actual hosted API with a synthetic QA applicant; removed only that generated account and its records afterwards. Live mobile homepage and internship navigation show no overflow or JavaScript errors. Hosted health, batch, session and static assets all return HTTP 200.
 
 The Vercel connector could not access the team scope, so deployment used the CLI's existing authorized login in the same scope. No new paid plan or integration subscription was purchased. Local SQLite data was not migrated. The hosted site is still a sample-data demo with shared accounts; real recruitment requires the previously listed identity, permissions, approved content, email and data-management work. One additional meaningful deployment commit records this milestone.
+
+## Visual refinement milestone
+
+Added the official certificate-portal YSSE logo to the header, footer and favicon, nine original department emblems to directory cards and department pages, and local illustrative teamwork/learning photos. Added linked homepage insights using the sourced founding year and department count, plus hover/pointer and keyboard-focus feedback for exploration links. Simplified sign-in/register labels and headings by removing demo wording; shared sample accounts and the site-wide sample-data notice retain their purpose.
+
+Validation: 15 local API tests and both browser suites pass. Reviewed desktop homepage and mobile department screenshots; mobile routes have no horizontal overflow. JavaScript syntax, formatting and diff checks pass. One meaningful visual-update commit is used for this request.
+`nOne repeat browser run timed out waiting for the announcement toast; the initial and subsequent complete runs passed, including public announcement visibility. No recruitment code was changed for this visual milestone.
