@@ -7,7 +7,10 @@ async function check(directory) {
     if (entry.isDirectory()) await check(path);
     else if (entry.name.endsWith('.js')) {
       const result = spawnSync(process.execPath, ['--check', path], { encoding: 'utf8' });
-      if (result.status !== 0) { console.error(result.stderr); process.exitCode = 1; }
+      if (result.status !== 0) {
+        console.error(result.stderr);
+        process.exitCode = 1;
+      }
     }
   }
 }
