@@ -959,7 +959,7 @@ label.search-box input {
     gap: 35px;
   }
   .hero h1 {
-    font-size: 48px;
+    font-size: clamp(30px, 10vw, 42px);
   }
   .hero-visual {
     max-width: 500px;
@@ -1049,6 +1049,15 @@ label.search-box input {
   .lesson-text {
     font-size: 16px;
   }
+}
+main:focus {
+  outline: none;
+}
+.hero-grid > * {
+  min-width: 0;
+}
+.dashboard-top > .badge {
+  margin-left: auto;
 }
 @media (prefers-reduced-motion: reduce) {
   * {

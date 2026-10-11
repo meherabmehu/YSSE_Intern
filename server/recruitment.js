@@ -77,6 +77,11 @@ export function getApplication(db, id, user) {
     'You cannot access this application.',
     403,
   );
+  requireValue(
+    user.role !== 'staff' || row.status !== 'draft',
+    'Draft applications are private to the applicant.',
+    403,
+  );
   return row;
 }
 export function serializeApplication(db, row, user) {

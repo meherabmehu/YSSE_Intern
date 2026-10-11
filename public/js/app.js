@@ -66,7 +66,20 @@ async function render() {
   });
   bindPublic(page, id);
   bindRecruitment(page, render);
-  await bindStaff(page, id, render);
+  if (page === 'dashboard' || page === 'staff') {
+    document
+      .querySelector('.dashboard-top')
+      ?.insertAdjacentHTML(
+        'beforeend',
+        '<button class="button secondary" id="refresh-workspace">Refresh ↻</button>',
+      );
+    document.querySelector('#refresh-workspace')?.addEventListener('click', render);
+  }
+  try {
+    await bindStaff(page, id, render);
+  } catch (error) {
+    toast(error.message, true);
+  }
   if (page === 'home' || page === 'updates') {
     try {
       const items = await api('/announcements');
@@ -89,4 +102,8 @@ async function render() {
   if (location.hash) document.querySelector('#main').focus({ preventScroll: true });
 }
 window.addEventListener('hashchange', render);
+document.querySelector('.skip-link').addEventListener('click', (event) => {
+  event.preventDefault();
+  document.querySelector('#main')?.focus();
+});
 render();

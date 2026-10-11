@@ -72,6 +72,7 @@ test('complete recruitment journey persists history, private evaluation and noti
   );
   assert.equal(draft.data.status, 'draft');
   assert.equal((await staff('/staff/applications')).data.length, 0);
+  assert.equal((await staff(`/staff/applications/${draft.data.id}`)).status, 403);
   const a = await submitted(applicant);
   const transition = (status, fields = {}) =>
     staff(`/staff/applications/${a.id}/transition`, { status, ...fields });
@@ -99,6 +100,44 @@ test('complete recruitment journey persists history, private evaluation and noti
   assert.equal(
     (await staff(`/staff/applications/${a.id}`)).data.review.notes,
     'Private reviewer comments',
+  );
+});
+test('simultaneous staff transitions cannot duplicate a stage change', async (t) => {
+  const { applicant, staff } = await setup(t);
+  const a = await submitted(applicant);
+  const responses = await Promise.all([
+    staff(`/staff/applications/${a.id}/transition`, { status: 'shortlisted' }),
+    staff(`/staff/applications/${a.id}/transition`, { status: 'shortlisted' }),
+  ]);
+  assert.deepEqual(responses.map((r) => r.status).sort(), [200, 409]);
+  assert.equal((await applicant('/application')).data.history.length, 2);
+});
+
+test('disabling demo mode blocks seeded account access and self-registration', async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), 'ysse-mode-test-'));
+  const dbPath = join(directory, 'demo.sqlite');
+  const first = await setup(t, { dbPath });
+  await new Promise((resolve) => first.server.close(resolve));
+  const server = createApp({ dbPath, demoMode: false });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  t.after(() => new Promise((resolve) => server.close(resolve)));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const headers = { 'Content-Type': 'application/json', 'X-YSSE-Request': 'portal' };
+  assert.equal(
+    (
+      await fetch(base + '/api/login', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ email: 'staff@demo.ysse.test', password: 'YsseDemo2026!' }),
+      })
+    ).status,
+    401,
+  );
+  assert.equal(
+    (await fetch(base + '/api/register', { method: 'POST', headers, body: JSON.stringify({}) }))
+      .status,
+    403,
   );
 });
 test('requires authentication, staff permissions and ownership for applications and CVs', async (t) => {

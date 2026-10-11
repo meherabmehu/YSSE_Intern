@@ -62,13 +62,13 @@ export function createApi(db, demoMode) {
       req.headers.cookie ?? '',
     )?.[1];
     if (!token) return null;
-    return (
+    const account =
       db
         .prepare(
           'SELECT u.* FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token=? AND s.expires>?',
         )
-        .get(hashToken(token), Date.now()) ?? null
-    );
+        .get(hashToken(token), Date.now()) ?? null;
+    return !demoMode && account?.id.startsWith('demo-') ? null : account;
   }
   function session(req, res, user) {
     const token = randomBytes(32).toString('hex');
@@ -141,7 +141,9 @@ export function createApi(db, demoMode) {
           .prepare('SELECT * FROM users WHERE email=?')
           .get(body.email.trim().toLowerCase());
         requireValue(
-          account && verifyPassword(body.password, account.password),
+          account &&
+            (demoMode || !account.id.startsWith('demo-')) &&
+            verifyPassword(body.password, account.password),
           'Email or password is incorrect.',
           401,
         );
@@ -288,11 +290,14 @@ export function createApi(db, demoMode) {
         if (req.method === 'GET' && !staffAction[2])
           json(res, 200, serializeApplication(db, row, user));
         else if (req.method === 'PUT' && staffAction[2] === 'review') {
-          updateReview(db, row, await readBody(req));
+          const body = await readBody(req);
+          updateReview(db, getApplication(db, row.id, user), body);
           json(res, 200, serializeApplication(db, getApplication(db, row.id, user), user));
-        } else if (req.method === 'POST' && staffAction[2] === 'transition')
-          json(res, 200, moveApplication(db, row, await readBody(req), user));
-        else throw new HttpError(405, 'Method not supported.');
+        } else if (req.method === 'POST' && staffAction[2] === 'transition') {
+          const body = await readBody(req);
+          // Re-read after I/O so another reviewer's transition cannot use a stale stage.
+          json(res, 200, moveApplication(db, getApplication(db, row.id, user), body, user));
+        } else throw new HttpError(405, 'Method not supported.');
         return true;
       }
       if (path === '/api/staff/batch' && req.method === 'PUT') {

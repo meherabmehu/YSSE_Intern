@@ -20,11 +20,15 @@
 ## Milestone 3 — verification and handover
 
 - [x] Recruitment and permission integration tests
-- [ ] Responsive/browser checks where tooling is available
-- [ ] Setup, demo walkthrough and production boundary documentation
-- [ ] Final progress update and clean Git status
+- [x] Responsive browser checks on desktop and mobile
+- [x] Setup, demo walkthrough and production boundary documentation
+- [x] Final progress update
+- [x] GitHub CI template and task/PR templates
+- [x] Final milestone committed and pushed with a clean working tree
 
 ## Production backlog
+
+- [ ] Activate `docs/ci/portal-checks.yml` as `.github/workflows/ci.yml` with workflow permission
 
 - [ ] Obtain approved branding, team directory and course recordings
 - [ ] HR approval of rules, permissions and workflow
