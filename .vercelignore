@@ -1,0 +1,12 @@
+.git
+.env*
+!.env.example
+.agents
+skills-lock.json
+node_modules
+data
+test-results
+playwright-report
+tests
+docs
+.github

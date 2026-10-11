@@ -28,6 +28,10 @@
 
 ## Production backlog
 
+- [x] Deploy a sample-data Vercel demo with isolated durable PostgreSQL storage
+- [x] Connect the existing GitHub repository for deployment on main pushes
+- [x] Verify hosted API recruitment lifecycle and mobile frontend
+
 - [ ] Activate `docs/ci/portal-checks.yml` as `.github/workflows/ci.yml` with workflow permission
 
 - [ ] Obtain approved branding, team directory and course recordings

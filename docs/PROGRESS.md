@@ -29,3 +29,11 @@ Added setup instructions, a complete walkthrough, architecture/security boundari
 Delivery used three meaningful milestone pushes. The first two were separated by about eleven minutes; the final push followed browser verification, fixes and documentation. No artificial empty commits or external lead messages were created. This document is ready for the project lead to review.
 
 Remaining production work is listed in TASKS.md: approved brand/team/course data, verified identity and email delivery, department-specific access, production hosting/backups and integration with existing systems. The demo stores local data and previews notifications; no live recruitment campaign or emails were launched.
+
+## Deployment milestone — Vercel and durable hosted storage
+
+Deployed the functional demo at https://ysse-portal.vercel.app and connected the existing GitHub repository for automatic deployment on main pushes. Added a Node.js 24 Vercel function adapter, routing/security headers and asynchronous database support. Local SQLite remains available; hosted sessions, applications, CVs, reviews and notifications use a new isolated Neon PostgreSQL database on the existing integration's Free plan in Singapore. Credentials are environment variables and ignored local files, never repository content.
+
+Validation: 15 local API/adapter tests pass, the live PostgreSQL integration test passes in an isolated temporary schema, and both local browser suites pass. Verified the full recruitment lifecycle on the actual hosted API with a synthetic QA applicant; removed only that generated account and its records afterwards. Live mobile homepage and internship navigation show no overflow or JavaScript errors. Hosted health, batch, session and static assets all return HTTP 200.
+
+The Vercel connector could not access the team scope, so deployment used the CLI's existing authorized login in the same scope. No new paid plan or integration subscription was purchased. Local SQLite data was not migrated. The hosted site is still a sample-data demo with shared accounts; real recruitment requires the previously listed identity, permissions, approved content, email and data-management work. One additional meaningful deployment commit records this milestone.

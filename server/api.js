@@ -36,6 +36,22 @@ async function readBody(req) {
     'Use application/json.',
     415,
   );
+  // Vercel parses JSON before calling the function; local Node requests remain streams.
+  if (req.body !== undefined) {
+    const raw = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
+    requireValue(Buffer.byteLength(raw) <= 3 * 1024 * 1024, 'Request is too large.', 413);
+    let value;
+    try {
+      value = typeof req.body === 'string' ? JSON.parse(raw) : req.body;
+    } catch {
+      throw new HttpError(400, 'Invalid JSON.');
+    }
+    requireValue(
+      value && typeof value === 'object' && !Array.isArray(value),
+      'Invalid request body.',
+    );
+    return value;
+  }
   let size = 0;
   const chunks = [];
   for await (const chunk of req) {
@@ -57,30 +73,28 @@ async function readBody(req) {
 }
 export function createApi(db, demoMode) {
   const attempts = new Map();
-  function authenticate(req) {
+  async function authenticate(req) {
     const token = /(?:^|;\s*)ysse_session=([a-f0-9]{64})(?:;|$)/.exec(
       req.headers.cookie ?? '',
     )?.[1];
     if (!token) return null;
     const account =
-      db
+      (await db
         .prepare(
           'SELECT u.* FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token=? AND s.expires>?',
         )
-        .get(hashToken(token), Date.now()) ?? null;
+        .get(hashToken(token), Date.now())) ?? null;
     return !demoMode && account?.id.startsWith('demo-') ? null : account;
   }
-  function session(req, res, user) {
+  async function session(req, res, user) {
     const token = randomBytes(32).toString('hex');
-    db.prepare('DELETE FROM sessions WHERE expires<?').run(Date.now());
-    db.prepare('INSERT INTO sessions VALUES (?,?,?)').run(
-      hashToken(token),
-      user.id,
-      Date.now() + 8 * 3600000,
-    );
+    await db.prepare('DELETE FROM sessions WHERE expires<?').run(Date.now());
+    await db
+      .prepare('INSERT INTO sessions VALUES (?,?,?)')
+      .run(hashToken(token), user.id, Date.now() + 8 * 3600000);
     res.setHeader(
       'Set-Cookie',
-      `ysse_session=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=28800${req.socket.encrypted ? '; Secure' : ''}`,
+      `ysse_session=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=28800${req.socket.encrypted || process.env.VERCEL ? '; Secure' : ''}`,
     );
   }
   function rateLimit(req) {
@@ -111,7 +125,7 @@ export function createApi(db, demoMode) {
             403,
           );
       }
-      const user = authenticate(req);
+      const user = await authenticate(req);
       if (path === '/api/health') {
         json(res, 200, { ok: true, demoMode });
         return true;
@@ -121,11 +135,11 @@ export function createApi(db, demoMode) {
         return true;
       }
       if (path === '/api/batch' && req.method === 'GET') {
-        json(res, 200, getSetting(db, 'batch'));
+        json(res, 200, await getSetting(db, 'batch'));
         return true;
       }
       if (path === '/api/announcements' && req.method === 'GET') {
-        json(res, 200, getSetting(db, 'announcements'));
+        json(res, 200, await getSetting(db, 'announcements'));
         return true;
       }
       if (path === '/api/login' && req.method === 'POST') {
@@ -137,7 +151,7 @@ export function createApi(db, demoMode) {
             body.password.length <= 256,
           'Enter your email and password.',
         );
-        const account = db
+        const account = await db
           .prepare('SELECT * FROM users WHERE email=?')
           .get(body.email.trim().toLowerCase());
         requireValue(
@@ -147,7 +161,7 @@ export function createApi(db, demoMode) {
           'Email or password is incorrect.',
           401,
         );
-        session(req, res, account);
+        await session(req, res, account);
         json(res, 200, { user: publicUser(account) });
         return true;
       }
@@ -177,26 +191,22 @@ export function createApi(db, demoMode) {
         );
         const email = body.email.trim().toLowerCase();
         requireValue(
-          !db.prepare('SELECT id FROM users WHERE email=?').get(email),
+          !(await db.prepare('SELECT id FROM users WHERE email=?').get(email)),
           'An account with this email already exists.',
           409,
         );
         const account = { id: newId(), name: body.name.trim(), email, role: 'applicant' };
-        db.prepare('INSERT INTO users VALUES (?,?,?,?,?)').run(
-          account.id,
-          account.name,
-          email,
-          hashPassword(body.password),
-          account.role,
-        );
-        session(req, res, account);
+        await db
+          .prepare('INSERT INTO users VALUES (?,?,?,?,?)')
+          .run(account.id, account.name, email, hashPassword(body.password), account.role);
+        await session(req, res, account);
         json(res, 201, { user: publicUser(account) });
         return true;
       }
       requireValue(user, 'Sign in to continue.', 401);
       if (path === '/api/logout' && req.method === 'POST') {
         const token = /ysse_session=([a-f0-9]{64})/.exec(req.headers.cookie ?? '')?.[1];
-        if (token) db.prepare('DELETE FROM sessions WHERE token=?').run(hashToken(token));
+        if (token) await db.prepare('DELETE FROM sessions WHERE token=?').run(hashToken(token));
         res.setHeader('Set-Cookie', 'ysse_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0');
         json(res, 200, { ok: true });
         return true;
@@ -205,7 +215,7 @@ export function createApi(db, demoMode) {
         json(
           res,
           200,
-          db
+          await db
             .prepare(
               'SELECT id,subject,body,created FROM notifications WHERE user_id=? ORDER BY id DESC LIMIT 50',
             )
@@ -215,21 +225,21 @@ export function createApi(db, demoMode) {
       }
       if (path === '/api/application' && req.method === 'GET') {
         requireValue(user.role === 'applicant', 'Applicant accounts only.', 403);
-        const batch = getSetting(db, 'batch');
-        const row = db
+        const batch = await getSetting(db, 'batch');
+        const row = await db
           .prepare('SELECT * FROM applications WHERE user_id=? AND batch_id=?')
           .get(user.id, batch.id);
-        json(res, 200, serializeApplication(db, row, user));
+        json(res, 200, await serializeApplication(db, row, user));
         return true;
       }
       if (path === '/api/application' && req.method === 'PUT') {
         requireValue(user.role === 'applicant', 'Applicant accounts only.', 403);
-        json(res, 200, saveApplication(db, user, await readBody(req)));
+        json(res, 200, await saveApplication(db, user, await readBody(req)));
         return true;
       }
       const action = /^\/api\/applications\/([^/]+)\/(accept|withdraw|cv)$/.exec(path);
       if (action) {
-        const row = getApplication(db, action[1], user);
+        const row = await getApplication(db, action[1], user);
         if (action[2] === 'cv' && req.method === 'GET') {
           requireValue(row.cv, 'No CV attached.', 404);
           res.writeHead(200, {
@@ -254,23 +264,29 @@ export function createApi(db, demoMode) {
           'This action is unavailable at the current stage.',
           409,
         );
-        transaction(db, () =>
-          recordStatus(
-            db,
-            row,
-            accept ? 'offer_accepted' : 'withdrawn',
-            user.name,
-            accept
-              ? 'You accepted your demo offer. Staff will complete onboarding.'
-              : 'You withdrew your application.',
-          ),
+        await transaction(
+          db,
+          async () =>
+            await recordStatus(
+              db,
+              row,
+              accept ? 'offer_accepted' : 'withdrawn',
+              user.name,
+              accept
+                ? 'You accepted your demo offer. Staff will complete onboarding.'
+                : 'You withdrew your application.',
+            ),
         );
-        json(res, 200, serializeApplication(db, getApplication(db, row.id, user), user));
+        json(
+          res,
+          200,
+          await serializeApplication(db, await getApplication(db, row.id, user), user),
+        );
         return true;
       }
       requireValue(user.role === 'staff', 'Staff access required.', 403);
       if (path === '/api/staff/applications' && req.method === 'GET') {
-        const rows = db
+        const rows = await db
           .prepare(
             "SELECT a.*,u.email FROM applications a JOIN users u ON u.id=a.user_id WHERE a.status != 'draft' ORDER BY a.updated DESC",
           )
@@ -278,7 +294,7 @@ export function createApi(db, demoMode) {
         json(
           res,
           200,
-          rows.map((row) => serializeApplication(db, row, user)),
+          await Promise.all(rows.map(async (row) => await serializeApplication(db, row, user))),
         );
         return true;
       }
@@ -286,23 +302,31 @@ export function createApi(db, demoMode) {
         path,
       );
       if (staffAction) {
-        const row = getApplication(db, staffAction[1], user);
+        const row = await getApplication(db, staffAction[1], user);
         if (req.method === 'GET' && !staffAction[2])
-          json(res, 200, serializeApplication(db, row, user));
+          json(res, 200, await serializeApplication(db, row, user));
         else if (req.method === 'PUT' && staffAction[2] === 'review') {
           const body = await readBody(req);
-          updateReview(db, getApplication(db, row.id, user), body);
-          json(res, 200, serializeApplication(db, getApplication(db, row.id, user), user));
+          await updateReview(db, await getApplication(db, row.id, user), body);
+          json(
+            res,
+            200,
+            await serializeApplication(db, await getApplication(db, row.id, user), user),
+          );
         } else if (req.method === 'POST' && staffAction[2] === 'transition') {
           const body = await readBody(req);
           // Re-read after I/O so another reviewer's transition cannot use a stale stage.
-          json(res, 200, moveApplication(db, getApplication(db, row.id, user), body, user));
+          json(
+            res,
+            200,
+            await moveApplication(db, await getApplication(db, row.id, user), body, user),
+          );
         } else throw new HttpError(405, 'Method not supported.');
         return true;
       }
       if (path === '/api/staff/batch' && req.method === 'PUT') {
-        const batch = validateBatch(await readBody(req), getSetting(db, 'batch'));
-        setSetting(db, 'batch', batch);
+        const batch = validateBatch(await readBody(req), await getSetting(db, 'batch'));
+        await setSetting(db, 'batch', batch);
         json(res, 200, batch);
         return true;
       }
@@ -326,7 +350,7 @@ export function createApi(db, demoMode) {
               (isWebUrl(body.href) || /^#\/[a-z-]+(?:\/[a-z-]+)?$/.test(body.href))),
           'Use a portal route or HTTPS link.',
         );
-        const items = getSetting(db, 'announcements');
+        const items = await getSetting(db, 'announcements');
         requireValue(items.length < 30, 'Remove an old announcement before adding another.');
         const item = {
           id: newId(),
@@ -337,19 +361,19 @@ export function createApi(db, demoMode) {
           date: new Date().toISOString(),
         };
         items.unshift(item);
-        setSetting(db, 'announcements', items);
+        await setSetting(db, 'announcements', items);
         json(res, 201, item);
         return true;
       }
       if (path.startsWith('/api/staff/announcements/') && req.method === 'DELETE') {
         const id = path.split('/').at(-1);
-        const items = getSetting(db, 'announcements');
+        const items = await getSetting(db, 'announcements');
         requireValue(
           items.some((item) => item.id === id),
           'Announcement not found.',
           404,
         );
-        setSetting(
+        await setSetting(
           db,
           'announcements',
           items.filter((item) => item.id !== id),
@@ -359,7 +383,13 @@ export function createApi(db, demoMode) {
       }
       throw new HttpError(404, 'Endpoint not found.');
     } catch (error) {
-      if (!(error instanceof HttpError)) console.error('API error:', error);
+      if (
+        error.code === '23505' ||
+        (error.code === 'ERR_SQLITE_ERROR' && error.message.includes('UNIQUE'))
+      )
+        error = new HttpError(409, 'This record already exists. Refresh and try again.');
+      if (!(error instanceof HttpError))
+        console.error('API error:', { name: error.name, code: error.code });
       json(res, error.status ?? 500, {
         error:
           error instanceof HttpError

@@ -12,11 +12,12 @@ const mime = {
   '.css': 'text/css; charset=utf-8',
   '.svg': 'image/svg+xml',
 };
-export function createApp({
+export async function createApp({
   dbPath = resolve(publicRoot, '../data/ysse.sqlite'),
   demoMode = process.env.DEMO_MODE !== 'false',
+  databaseUrl = process.env.DATABASE_URL ?? '',
 } = {}) {
-  const db = openDatabase(dbPath, demoMode);
+  const db = await openDatabase(dbPath, demoMode, databaseUrl);
   const api = createApi(db, demoMode);
   const server = createServer(async (req, res) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -27,7 +28,7 @@ export function createApp({
     );
     try {
       const url = new URL(req.url, 'http://localhost');
-      if (await api(req, res, url)) return;
+      if (await db.exclusive(() => api(req, res, url))) return;
       if (!['GET', 'HEAD'].includes(req.method)) {
         res.writeHead(405);
         res.end('Method not supported');
@@ -53,12 +54,13 @@ export function createApp({
       res.end('Not found');
     }
   });
-  server.on('close', () => db.close());
+  server.on('close', async () => await db.close());
   return server;
 }
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const port = Number(process.env.PORT ?? 3000);
-  createApp().listen(port, process.env.HOST ?? '127.0.0.1', () =>
+  const app = await createApp();
+  app.listen(port, process.env.HOST ?? '127.0.0.1', () =>
     console.log(`YSSE portal: http://${process.env.HOST ?? '127.0.0.1'}:${port}`),
   );
 }

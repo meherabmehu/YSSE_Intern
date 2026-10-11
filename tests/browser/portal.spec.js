@@ -3,7 +3,7 @@ import { createApp } from '../../server/index.js';
 
 let server;
 test.beforeAll(async () => {
-  server = createApp({ dbPath: ':memory:', demoMode: true });
+  server = await createApp({ dbPath: ':memory:', databaseUrl: '', demoMode: true });
   await new Promise((resolve) => server.listen(3100, '127.0.0.1', resolve));
 });
 test.afterAll(async () => {

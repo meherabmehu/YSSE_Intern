@@ -2,7 +2,7 @@
 
 ## Runtime
 
-Node.js 24 serves a vanilla HTML/CSS/JavaScript frontend and a JSON API. Runtime code has no third-party dependencies. Development tools are locked in `package-lock.json`. Browser routes use the URL hash; the server still must run because recruitment and account features require the API.
+Node.js 24 serves a vanilla HTML/CSS/JavaScript frontend and a JSON API. The `pg` driver provides PostgreSQL access on Vercel; local development can still use Node's built-in SQLite driver. Runtime and development dependencies are locked in `package-lock.json`. Browser routes use the URL hash; recruitment and account features require the API.
 
 The visual direction uses an original SVG illustration and a proposed mark. Fonts load from Google Fonts with system fallbacks. No external images, Facebook feed or analytics scripts are required for the demo.
 
@@ -24,6 +24,8 @@ The visual direction uses an original SVG illustration and a proposed mark. Font
 ## Storage
 
 The ignored `data/ysse.sqlite` database stores accounts, sessions, batch settings, announcements, applications, CV bytes, evaluation records, history and notification previews. SQLite WAL files can also appear in `data/`. Database and CV files never enter Git. API and browser tests use isolated databases.
+
+When `DATABASE_URL` is set, the same records are stored in PostgreSQL instead. `server/storage.js` provides a shared asynchronous interface for both databases; `server/errors.js` provides shared API errors. `api/index.js` initializes the durable database for Vercel requests. PostgreSQL transitions use transactional compare-and-swap updates so competing server instances cannot record the same status twice.
 
 The application identifier is a UUID; the shortened reference displayed in the UI is for convenience. One account can create one application in the current batch. Submitted application details are locked. Every transition stores an actor, timestamp and applicant-safe message. Review notes and scores are excluded from applicant responses.
 
@@ -54,7 +56,7 @@ This local demo is not ready for public recruitment with real applicant data. Be
 
 `DEMO_MODE=false` disables seeded demo-account access and new self-registration; it is not a production authentication integration. Custom accounts created during the demo remain unverified. Start from a clean production database with an approved identity flow.
 
-The server binds to `127.0.0.1` by default. Do not expose the seeded-account demo publicly. Configure `PORT` and `HOST` through environment variables only when needed for a controlled preview.
+The local server binds to `127.0.0.1` by default. The Vercel deployment is a public sample-data demo with shared applicant/staff accounts. It must not collect real applicant information. Configure `PORT` and `HOST` through environment variables only when needed for local previews. See VERCEL.md for the hosted database and verification details.
 
 ## Verification
 

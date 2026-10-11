@@ -3,3 +3,7 @@ data
 test-results
 playwright-report
 package-lock.json
+.vercel
+.env*
+.agents
+skills-lock.json

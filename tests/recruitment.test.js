@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { createApp } from '../server/index.js';
 
 async function setup(t, options = {}) {
-  const server = createApp({ dbPath: ':memory:', ...options });
+  const server = await createApp({ dbPath: ':memory:', databaseUrl: '', ...options });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   t.after(() => (server.listening ? new Promise((resolve) => server.close(resolve)) : undefined));
   const base = `http://127.0.0.1:${server.address().port}`;
@@ -118,7 +118,7 @@ test('disabling demo mode blocks seeded account access and self-registration', a
   const dbPath = join(directory, 'demo.sqlite');
   const first = await setup(t, { dbPath });
   await new Promise((resolve) => first.server.close(resolve));
-  const server = createApp({ dbPath, demoMode: false });
+  const server = await createApp({ dbPath, databaseUrl: '', demoMode: false });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   t.after(() => new Promise((resolve) => server.close(resolve)));
   t.after(() => rm(directory, { recursive: true, force: true }));

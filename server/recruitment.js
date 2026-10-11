@@ -1,15 +1,8 @@
 import { departments } from '../public/js/data.js';
 import { getSetting, newId, recordStatus, transaction } from './database.js';
 
-export class HttpError extends Error {
-  constructor(status, message) {
-    super(message);
-    this.status = status;
-  }
-}
-export function requireValue(condition, message, status = 400) {
-  if (!condition) throw new HttpError(status, message);
-}
+import { HttpError, requireValue } from './errors.js';
+export { HttpError, requireValue } from './errors.js';
 export const transitions = {
   submitted: ['shortlisted', 'waitlisted', 'rejected'],
   waitlisted: ['shortlisted', 'selected', 'rejected'],
@@ -67,8 +60,8 @@ export function isWebUrl(value) {
     return false;
   }
 }
-export function getApplication(db, id, user) {
-  const row = db
+export async function getApplication(db, id, user) {
+  const row = await db
     .prepare('SELECT a.*,u.email FROM applications a JOIN users u ON u.id=a.user_id WHERE a.id=?')
     .get(id);
   requireValue(row, 'Application not found.', 404);
@@ -84,15 +77,15 @@ export function getApplication(db, id, user) {
   );
   return row;
 }
-export function serializeApplication(db, row, user) {
+export async function serializeApplication(db, row, user) {
   if (!row) return null;
   const { cv, payload, ...application } = row;
   application.data = JSON.parse(payload);
   application.hasCv = Boolean(cv);
-  application.history = db
+  application.history = await db
     .prepare('SELECT status,actor,message,created FROM history WHERE application_id=? ORDER BY id')
     .all(row.id);
-  const review = db.prepare('SELECT * FROM reviews WHERE application_id=?').get(row.id);
+  const review = await db.prepare('SELECT * FROM reviews WHERE application_id=?').get(row.id);
   application.interview = review?.scheduled_at
     ? {
         interviewer: review.interviewer,
@@ -103,8 +96,8 @@ export function serializeApplication(db, row, user) {
   if (user.role === 'staff') application.review = review ?? { notes: '', score: null };
   return application;
 }
-export function saveApplication(db, user, body) {
-  const batch = getSetting(db, 'batch');
+export async function saveApplication(db, user, body) {
+  const batch = await getSetting(db, 'batch');
   requireValue(
     batch.open && Date.parse(batch.deadline) > Date.now(),
     'Applications for this batch are closed.',
@@ -114,7 +107,7 @@ export function saveApplication(db, user, body) {
     typeof body.department === 'string' && batch.departments.includes(body.department),
     'Choose a department recruiting in this batch.',
   );
-  const existing = db
+  const existing = await db
     .prepare('SELECT * FROM applications WHERE user_id=? AND batch_id=?')
     .get(user.id, batch.id);
   requireValue(
@@ -147,26 +140,30 @@ export function saveApplication(db, user, body) {
     requireValue(cv || data.portfolio, 'Attach a PDF CV or provide a portfolio link.');
   const now = new Date().toISOString();
   const id = existing?.id ?? newId();
-  transaction(db, () => {
+  await transaction(db, async () => {
     if (existing)
-      db.prepare(
-        'UPDATE applications SET department=?,payload=?,cv_name=?,cv=?,updated=? WHERE id=?',
-      ).run(body.department, JSON.stringify(data), cvName, cv, now, id);
+      await db
+        .prepare(
+          'UPDATE applications SET department=?,payload=?,cv_name=?,cv=?,updated=? WHERE id=?',
+        )
+        .run(body.department, JSON.stringify(data), cvName, cv, now, id);
     else
-      db.prepare('INSERT INTO applications VALUES (?,?,?,?,?,?,?,?,?,?)').run(
-        id,
-        user.id,
-        batch.id,
-        body.department,
-        'draft',
-        JSON.stringify(data),
-        cvName,
-        cv,
-        now,
-        now,
-      );
+      await db
+        .prepare('INSERT INTO applications VALUES (?,?,?,?,?,?,?,?,?,?)')
+        .run(
+          id,
+          user.id,
+          batch.id,
+          body.department,
+          'draft',
+          JSON.stringify(data),
+          cvName,
+          cv,
+          now,
+          now,
+        );
     if (submitting)
-      recordStatus(
+      await recordStatus(
         db,
         { id, user_id: user.id },
         'submitted',
@@ -174,11 +171,11 @@ export function saveApplication(db, user, body) {
         'Your application has been received. The recruitment team will review it.',
       );
   });
-  return serializeApplication(db, getApplication(db, id, user), user);
+  return await serializeApplication(db, await getApplication(db, id, user), user);
 }
-export function updateReview(db, row, body) {
+export async function updateReview(db, row, body) {
   requireValue(row.status !== 'draft', 'Drafts cannot be reviewed.', 409);
-  const old = db.prepare('SELECT * FROM reviews WHERE application_id=?').get(row.id) ?? {};
+  const old = (await db.prepare('SELECT * FROM reviews WHERE application_id=?').get(row.id)) ?? {};
   const score =
     body.score === null || body.score === ''
       ? null
@@ -189,11 +186,13 @@ export function updateReview(db, row, body) {
     score === null || (Number.isInteger(score) && score >= 0 && score <= 100),
     'Score must be between 0 and 100.',
   );
-  db.prepare(
-    `INSERT INTO reviews(application_id,notes,score) VALUES (?,?,?) ON CONFLICT(application_id) DO UPDATE SET notes=excluded.notes,score=excluded.score`,
-  ).run(row.id, clean(body.notes ?? old.notes, 5000), score);
+  await db
+    .prepare(
+      `INSERT INTO reviews(application_id,notes,score) VALUES (?,?,?) ON CONFLICT(application_id) DO UPDATE SET notes=excluded.notes,score=excluded.score`,
+    )
+    .run(row.id, clean(body.notes ?? old.notes, 5000), score);
 }
-export function moveApplication(db, row, body, user) {
+export async function moveApplication(db, row, body, user) {
   const next = body.status;
   requireValue(
     transitions[row.status]?.includes(next),
@@ -202,7 +201,7 @@ export function moveApplication(db, row, body, user) {
   );
   if (next === 'selected' && row.status === 'waitlisted') {
     requireValue(
-      db
+      await db
         .prepare("SELECT id FROM history WHERE application_id=? AND status='interviewed'")
         .get(row.id),
       'Complete an interview before selection.',
@@ -227,20 +226,22 @@ export function moveApplication(db, row, body, user) {
     selected: 'You have been selected. Review and accept your demo offer in the dashboard.',
     onboarded: 'Onboarding is complete. Welcome to your assigned department.',
   };
-  transaction(db, () => {
-    updateReview(db, row, body);
+  await transaction(db, async () => {
+    await updateReview(db, row, body);
     if (next === 'interview_scheduled')
-      db.prepare(
-        `INSERT INTO reviews(application_id,interviewer,scheduled_at,meeting_url) VALUES (?,?,?,?) ON CONFLICT(application_id) DO UPDATE SET interviewer=excluded.interviewer,scheduled_at=excluded.scheduled_at,meeting_url=excluded.meeting_url`,
-      ).run(
-        row.id,
-        clean(body.interviewer, 100),
-        new Date(body.scheduledAt).toISOString(),
-        body.meetingUrl,
-      );
-    recordStatus(db, row, next, user.name, messages[next]);
+      await db
+        .prepare(
+          `INSERT INTO reviews(application_id,interviewer,scheduled_at,meeting_url) VALUES (?,?,?,?) ON CONFLICT(application_id) DO UPDATE SET interviewer=excluded.interviewer,scheduled_at=excluded.scheduled_at,meeting_url=excluded.meeting_url`,
+        )
+        .run(
+          row.id,
+          clean(body.interviewer, 100),
+          new Date(body.scheduledAt).toISOString(),
+          body.meetingUrl,
+        );
+    await recordStatus(db, row, next, user.name, messages[next]);
   });
-  return serializeApplication(db, getApplication(db, row.id, user), user);
+  return await serializeApplication(db, await getApplication(db, row.id, user), user);
 }
 export function validateBatch(body, previous) {
   requireValue(clean(body.title, 150).length >= 3, 'Batch title is required.');

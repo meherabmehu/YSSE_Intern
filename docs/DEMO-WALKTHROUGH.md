@@ -1,6 +1,6 @@
 # Demo walkthrough
 
-Start the portal with `npm start` (`npm.cmd start` in restricted Windows PowerShell), then open http://127.0.0.1:3000.
+After `npm ci`, start the portal with `npm start` (`npm.cmd start` in restricted Windows PowerShell), then open http://127.0.0.1:3000. The same journey is available on the Vercel demo; its accounts and applications are shared sample data.
 
 Use sample information. This is not a live application to YSSE.
 
@@ -44,6 +44,6 @@ Times display in Asia/Dhaka. Date/time input fields use the device timezone and 
 
 ## Boundaries
 
-The demo previews notifications and offers; it does not send emails, create meeting invitations, verify identity, issue official certificates or publish to Facebook. Learning content, hierarchy and visual branding are proposed samples. Approved course recordings and real team profiles need YSSE content.
+The demo previews notifications and offers; it does not send emails, create meeting invitations, verify identity, issue official certificates or publish to Facebook. Learning content, hierarchy and visual branding are proposed samples. Approved course recordings and real team profiles need YSSE content. Local data uses SQLite; the hosted demonstration uses Neon PostgreSQL. The staff demo account can view all submitted sample applications.
 
 The seeded applicant can submit once per batch. To explore another application, create another demo account with a different sample email. The demonstration configures one batch; multiple-batch creation and historical batch administration remain future extensions.

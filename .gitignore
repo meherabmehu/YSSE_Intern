@@ -6,3 +6,9 @@ playwright-report/
 .env
 *.log
 .DS_Store
+
+.vercel
+.env*
+.agents/
+skills-lock.json
+!.env.example
