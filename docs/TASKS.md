@@ -51,3 +51,9 @@ Board flow: Backlog → Ready → In progress → Review → Done.
 - [x] Add department emblems to all nine cards and detail pages
 - [x] Add pointer cursor, hover and keyboard-focus treatment to exploration links
 - [x] Remove demo wording from sign-in/register headings and labels
+
+## Documentation report — 27 October 2026
+
+- [x] Review the supplied Main Portal Research & Feasibility Report
+- [x] Map research requirements to implemented, partial and future features
+- [x] Produce one PDF with screenshots, user/staff guides, architecture, API, setup, testing and handover

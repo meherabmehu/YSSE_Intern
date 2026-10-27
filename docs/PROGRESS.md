@@ -44,3 +44,9 @@ Added the official certificate-portal YSSE logo to the header, footer and favico
 
 Validation: 15 local API tests and both browser suites pass. Reviewed desktop homepage and mobile department screenshots; mobile routes have no horizontal overflow. JavaScript syntax, formatting and diff checks pass. One meaningful visual-update commit is used for this request.
 `nOne repeat browser run timed out waiting for the announcement toast; the initial and subsequent complete runs passed, including public announcement visibility. No recruitment code was changed for this visual milestone.
+
+## PDF documentation handover ? 27 October 2026
+
+Created docs/YSSE-Main-Portal-Documentation.pdf, a single 14-page project documentation and handover file. Reviewed the supplied Wing 05 Team A Research & Feasibility Report dated 23 October 2026 and mapped its broader proposals to the actual d9f6f95 code baseline. The PDF separates implemented features from partial and future work and documents public pages, all nine departments, learning, applicant/staff workflows, architecture, schema/API, security boundaries, local/hosted setup, risks, measures and source provenance. Screenshots use local sample data.
+
+Fresh checks: JavaScript syntax passed; 15 API/adapter tests passed with the optional PostgreSQL test skipped; both Playwright browser suites passed. This documentation task did not mutate hosted records or rerun hosted PostgreSQL integration. The report layout was checked for page overflow before PDF generation.

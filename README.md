@@ -4,6 +4,8 @@ A modular functional demonstration of YSSE's public portal, learning resources a
 
 **Live demo:** https://ysse-portal.vercel.app
 
+**Project documentation (PDF):** [YSSE Main Portal Documentation](docs/YSSE-Main-Portal-Documentation.pdf) — 27 October 2026; implementation, workflows, setup, verification and alignment with the supplied research report.
+
 Vercel is connected to this repository. Pushes to `main` trigger production deployment. Hosted recruitment data uses Neon PostgreSQL; use sample data only.
 
 ## Run locally
